@@ -6,7 +6,7 @@
     <title>PalmLogistik Lokal - Manajemen RAM TBS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Tambahkan Pustaka SheetJS untuk Export Excel -->
+    <!-- Pustaka SheetJS untuk Export Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
@@ -100,6 +100,12 @@
                         </div>
 
                         <form id="trans-form" class="space-y-4">
+                            <!-- Input Tanggal Manual -->
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Tanggal Transaksi</label>
+                                <input required type="date" id="transDate" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-500" />
+                            </div>
+                            
                             <input required type="text" id="partyName" placeholder="Nama Petani / PKS" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-500" />
                             <div class="grid grid-cols-2 gap-4">
                                 <input required type="number" id="grossWeight" placeholder="Bruto (KG)" oninput="recalculate()" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
@@ -116,7 +122,7 @@
 
                     <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                         <h3 class="text-lg font-bold mb-6 flex items-center gap-2"><i data-lucide="history" class="text-slate-400"></i> Transaksi Terakhir</h3>
-                        <div id="recent-activities" class="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        <div id="recent-activities" class="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                             <!-- JS Injection -->
                         </div>
                     </div>
@@ -131,6 +137,7 @@
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase border-b">
                                 <tr>
+                                    <th class="px-6 py-4">Tanggal</th>
                                     <th class="px-6 py-4">Tipe</th>
                                     <th class="px-6 py-4">Pihak</th>
                                     <th class="px-6 py-4">Bersih</th>
@@ -147,13 +154,32 @@
             <!-- Tab: Expenses -->
             <div id="tab-expenses" class="tab-content hidden max-w-3xl mx-auto space-y-6">
                 <h2 class="text-2xl font-black">Biaya Operasional</h2>
-                <form id="exp-form" class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4">
-                    <input required type="text" id="expNote" placeholder="Keterangan (Solar, Gaji, dll)" class="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
-                    <input required type="number" id="expAmount" placeholder="Rp" class="w-full md:w-48 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
-                    <button class="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold">Tambah</button>
+                <form id="exp-form" class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Tanggal Biaya</label>
+                            <input required type="date" id="expDate" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black uppercase text-slate-400 ml-1">Keterangan</label>
+                            <input required type="text" id="expNote" placeholder="Solar, Gaji, dll" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                        </div>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <input required type="number" id="expAmount" placeholder="Jumlah (Rp)" class="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                        <button class="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold">Tambah Biaya</button>
+                    </div>
                 </form>
                 <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
                     <table class="w-full text-left">
+                        <thead class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase border-b">
+                            <tr>
+                                <th class="px-6 py-4">Tanggal</th>
+                                <th class="px-6 py-4">Keterangan</th>
+                                <th class="px-6 py-4 text-right">Jumlah</th>
+                                <th class="px-6 py-4 text-center">Hapus</th>
+                            </tr>
+                        </thead>
                         <tbody id="expense-table-body" class="divide-y divide-slate-100"></tbody>
                     </table>
                 </div>
@@ -193,13 +219,21 @@
         let expenses = JSON.parse(localStorage.getItem('palm_expenses')) || [];
         let currentType = 'pembelian';
 
+        // Helper untuk tanggal hari ini format YYYY-MM-DD
+        const getTodayStr = () => new Date().toISOString().split('T')[0];
+
         const saveData = () => {
+            // Sort transaksi berdasarkan tanggal (terbaru di atas)
+            transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+            expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
             localStorage.setItem('palm_transactions', JSON.stringify(transactions));
             localStorage.setItem('palm_expenses', JSON.stringify(expenses));
             updateUI();
         };
 
         const formatIDR = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+        const formatDate = (d) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 
         const updateUI = () => {
             const tonIn = transactions.filter(t => t.type === 'pembelian').reduce((a, b) => a + Number(b.netWeight), 0);
@@ -210,7 +244,7 @@
             const stock = tonIn - tonOut;
             const netProfit = (sellVal - buyVal) - expVal;
 
-            document.getElementById('report-date-info').innerText = `Per tanggal: ${new Date().toLocaleDateString('id-ID')}`;
+            document.getElementById('report-date-info').innerText = `Data hingga: ${new Date().toLocaleDateString('id-ID')}`;
 
             // Stats
             document.getElementById('stat-tonase-in').innerHTML = `${tonIn.toLocaleString()} <span class="text-xs font-normal">KG</span>`;
@@ -221,13 +255,14 @@
 
             // Recent Dashboard
             const recentContainer = document.getElementById('recent-activities');
-            recentContainer.innerHTML = transactions.slice().reverse().slice(0, 8).map(t => `
+            recentContainer.innerHTML = transactions.slice(0, 8).map(t => `
                 <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                     <div class="flex items-center space-x-3">
                         <div class="p-2 rounded-xl ${t.type === 'pembelian' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}">
                             <i data-lucide="${t.type === 'pembelian' ? 'arrow-down-right' : 'arrow-up-right'}"></i>
                         </div>
                         <div>
+                            <p class="text-xs font-bold text-slate-400">${formatDate(t.date)}</p>
                             <p class="text-sm font-black text-slate-800">${t.partyName}</p>
                             <p class="text-[10px] font-bold text-slate-400 uppercase">${t.netWeight.toLocaleString()} KG • ${t.type}</p>
                         </div>
@@ -239,25 +274,27 @@
             `).join('') || '<p class="text-center text-slate-400 py-10 italic">Belum ada data</p>';
 
             // History Table
-            document.getElementById('history-table-body').innerHTML = transactions.slice().reverse().map((t, idx) => `
+            document.getElementById('history-table-body').innerHTML = transactions.map((t, idx) => `
                 <tr class="text-sm">
+                    <td class="px-6 py-4 text-slate-500 font-medium">${formatDate(t.date)}</td>
                     <td class="px-6 py-4"><span class="px-2 py-0.5 rounded text-[10px] font-black uppercase ${t.type === 'pembelian' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}">${t.type}</span></td>
                     <td class="px-6 py-4 font-bold">${t.partyName}</td>
                     <td class="px-6 py-4">${t.netWeight.toLocaleString()} KG</td>
                     <td class="px-6 py-4 text-right font-black">${formatIDR(t.totalPrice)}</td>
                     <td class="px-6 py-4 text-center">
-                        <button onclick="deleteItem('trans', ${transactions.length - 1 - idx})" class="text-slate-300 hover:text-rose-500"><i data-lucide="trash-2" size="16"></i></button>
+                        <button onclick="deleteItem('trans', ${idx})" class="text-slate-300 hover:text-rose-500"><i data-lucide="trash-2" size="16"></i></button>
                     </td>
                 </tr>
             `).join('');
 
             // Expense Table
-            document.getElementById('expense-table-body').innerHTML = expenses.slice().reverse().map((e, idx) => `
-                <tr class="hover:bg-slate-50">
-                    <td class="px-6 py-4 text-sm font-bold text-slate-700">${e.note}</td>
+            document.getElementById('expense-table-body').innerHTML = expenses.map((e, idx) => `
+                <tr class="hover:bg-slate-50 text-sm">
+                    <td class="px-6 py-4 text-slate-500 font-medium">${formatDate(e.date)}</td>
+                    <td class="px-6 py-4 font-bold text-slate-700">${e.note}</td>
                     <td class="px-6 py-4 text-right font-black text-rose-500">${formatIDR(e.amount)}</td>
                     <td class="px-6 py-4 text-center">
-                        <button onclick="deleteItem('exp', ${expenses.length - 1 - idx})" class="text-slate-300 hover:text-rose-500"><i data-lucide="trash-2" size="16"></i></button>
+                        <button onclick="deleteItem('exp', ${idx})" class="text-slate-300 hover:text-rose-500"><i data-lucide="trash-2" size="16"></i></button>
                     </td>
                 </tr>
             `).join('');
@@ -270,7 +307,7 @@
                     <div class="flex justify-between py-4 bg-slate-50 px-4 rounded-xl font-black"><span>MARGIN BRUTO</span><span>${formatIDR(sellVal - buyVal)}</span></div>
                     <div class="py-2">
                         <p class="text-xs font-black text-slate-400 uppercase mb-2">Biaya Operasional</p>
-                        ${expenses.map(e => `<div class="flex justify-between text-sm py-1"><span>${e.note}</span><span>${formatIDR(e.amount)}</span></div>`).join('')}
+                        ${expenses.length > 0 ? expenses.map(e => `<div class="flex justify-between text-sm py-1"><span>${e.note}</span><span>${formatIDR(e.amount)}</span></div>`).join('') : '<p class="text-xs italic text-slate-400">Belum ada biaya</p>'}
                         <div class="flex justify-between text-sm font-bold border-t mt-2 pt-2 text-rose-600"><span>Total Biaya</span><span>(${formatIDR(expVal)})</span></div>
                     </div>
                     <div class="flex justify-between py-6 border-t-4 border-double border-slate-200 mt-4 items-center">
@@ -282,16 +319,14 @@
             lucide.createIcons();
         };
 
-        // --- Fungsi Download Excel ---
         const downloadExcel = () => {
             if (transactions.length === 0 && expenses.length === 0) {
                 alert("Tidak ada data untuk diunduh!");
                 return;
             }
 
-            // 1. Persiapkan data transaksi
             const transData = transactions.map(t => ({
-                Tanggal: new Date(t.date).toLocaleString('id-ID'),
+                Tanggal: formatDate(t.date),
                 Tipe: t.type.toUpperCase(),
                 Pihak: t.partyName,
                 Bruto_KG: t.grossWeight,
@@ -301,14 +336,12 @@
                 Total_IDR: t.totalPrice
             }));
 
-            // 2. Persiapkan data biaya
             const expData = expenses.map(e => ({
-                Tanggal: new Date(e.date).toLocaleString('id-ID'),
+                Tanggal: formatDate(e.date),
                 Keterangan: e.note,
                 Jumlah_IDR: e.amount
             }));
 
-            // 3. Persiapkan Ringkasan Laba Rugi
             const tonIn = transactions.filter(t => t.type === 'pembelian').reduce((a, b) => a + Number(b.netWeight), 0);
             const tonOut = transactions.filter(t => t.type === 'penjualan').reduce((a, b) => a + Number(b.netWeight), 0);
             const buyVal = transactions.filter(t => t.type === 'pembelian').reduce((a, b) => a + Number(b.totalPrice), 0);
@@ -319,32 +352,23 @@
                 ["LAPORAN LABA RUGI PALMLOGISTIK"],
                 ["Tanggal Laporan:", new Date().toLocaleString('id-ID')],
                 [],
-                ["Keterangan", "Nilai (IDR / KG)"],
-                ["Total TBS Masuk (Beli)", tonIn + " KG"],
-                ["Total TBS Keluar (Jual)", tonOut + " KG"],
+                ["Keterangan", "Nilai"],
+                ["Total TBS Masuk", tonIn + " KG"],
+                ["Total TBS Keluar", tonOut + " KG"],
                 ["Stok Sisa", (tonIn - tonOut) + " KG"],
                 [],
                 ["Total Penjualan", sellVal],
                 ["Total Pembelian", buyVal],
                 ["Margin Bruto", sellVal - buyVal],
-                ["Total Biaya Operasional", expTotal],
+                ["Total Biaya Ops", expTotal],
                 ["LABA BERSIH", (sellVal - buyVal) - expTotal]
             ];
 
-            // Buat Workbook baru
             const wb = XLSX.utils.book_new();
-
-            // Tambahkan Sheet
-            const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-            const wsTrans = XLSX.utils.json_to_sheet(transData);
-            const wsExp = XLSX.utils.json_to_sheet(expData);
-
-            XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan");
-            XLSX.utils.book_append_sheet(wb, wsTrans, "Data Transaksi");
-            XLSX.utils.book_append_sheet(wb, wsExp, "Data Biaya");
-
-            // Simpan File
-            XLSX.writeFile(wb, `Laporan_PalmLogistik_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Ringkasan");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(transData), "Data Transaksi");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expData), "Data Biaya");
+            XLSX.writeFile(wb, `Laporan_PalmLogistik_${getTodayStr()}.xlsx`);
         };
 
         const setTransType = (type) => {
@@ -394,10 +418,11 @@
                 pricePerKg: price,
                 totalPrice: net * price,
                 type: currentType,
-                date: new Date().toISOString()
+                date: document.getElementById('transDate').value // Ambil dari input manual
             });
             saveData();
             e.target.reset();
+            document.getElementById('transDate').value = getTodayStr();
             recalculate();
         };
 
@@ -406,10 +431,11 @@
             expenses.push({
                 note: document.getElementById('expNote').value,
                 amount: parseFloat(document.getElementById('expAmount').value),
-                date: new Date().toISOString()
+                date: document.getElementById('expDate').value // Ambil dari input manual
             });
             saveData();
             e.target.reset();
+            document.getElementById('expDate').value = getTodayStr();
         };
 
         const deleteItem = (type, index) => {
@@ -425,11 +451,14 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `PalmLogistik_Lokal_Backup_${new Date().toLocaleDateString()}.json`;
+            a.download = `Backup_PalmFinance_${getTodayStr()}.json`;
             a.click();
         };
 
         window.onload = () => {
+            // Set default date hari ini
+            document.getElementById('transDate').value = getTodayStr();
+            document.getElementById('expDate').value = getTodayStr();
             updateUI();
             lucide.createIcons();
         };
